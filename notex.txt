@@ -1,3 +1,4 @@
+Phase 1 ML 
 Step-1: Create virtual env
 python -m venv kiet-env
 
@@ -22,3 +23,21 @@ python train.py
 Step-7: Implement FastAPI and create endpoints
 Step-8: Start the API
 uvicorn main:app --reload
+
+Phase 2 - VIRTUALIZATION with DOCKER
+WHY DOCKER?
+-Imagine you are running your code on your laptop with different programming version and another user is working on a different version...
+
+Reason of Failures:
+-Using different programming version
+-Using different version of libraries like scikit-learn, FastAPI
+-Missing Python packages
+-different OS dependencies
+
+DOCKER helps package your application code, runtime, dependencies and startup instructions into a standardized image
+
+4 Major requirements:
+-Dockerfile-- set of instructions for packaging ML application
+-Image-- Packaged reusable application artifact
+-Container-- A running instance of the image 
+-Port Mapping-- Makes the API inside the Container accessible from system 

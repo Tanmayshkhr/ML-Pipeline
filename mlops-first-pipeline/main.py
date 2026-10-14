@@ -20,3 +20,18 @@ def health_check():
 @app.get("/health")
 def health_check():
     return {"status": "healty"}
+
+@app.post("/predict")
+def predict(input_data: IrisInput):
+    features = [[
+        input_data.sepal_length,
+        input_data.sepal_width,
+        input_data.petal_length,
+        input_data.petal_width    
+]]
+    prediction = int(model.predict(features)[0])
+
+    return{
+        "prediction": prediction,
+        "class_name": ["setosa", "versicolor", "virginica"][prediction]
+    }
