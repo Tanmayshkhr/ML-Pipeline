@@ -13,10 +13,10 @@ class IrisInput(BaseModel):
     petal_length: float = Field(gt =0)
     petal_width: float = Field(gt =0)
 
-@app.post("/health")
-def health_check():
-    return {"status": "healthy"}
-
 @app.get("/")
-def read_root():
-    return {"message": "Iris ML API is up and running!"}
+def health_check():
+    return {"status": "API is ready to serve..."}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healty"}
