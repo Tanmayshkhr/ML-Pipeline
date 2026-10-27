@@ -40,4 +40,16 @@ DOCKER helps package your application code, runtime, dependencies and startup in
 -Dockerfile-- set of instructions for packaging ML application
 -Image-- Packaged reusable application artifact
 -Container-- A running instance of the image 
--Port Mapping-- Makes the API inside the Container accessible from system 
+-Port Mapping-- Makes the API inside the Container accessible from system
+
+Install MLFlow
+pip install mlflow
+
+Start MLFlow Tracking Server
+mlflow server \
+--backend-store-uri sqlite:///mlflow.db \
+--host 0.0.0.0 \
+--port 6001
+
+Open Browser and test URL:
+http://0.0.0.0:6001

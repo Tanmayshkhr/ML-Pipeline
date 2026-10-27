@@ -19,7 +19,7 @@ def health_check():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healty"}
+    return {"status": "healthy"}
 
 @app.post("/predict")
 def predict(input_data: IrisInput):

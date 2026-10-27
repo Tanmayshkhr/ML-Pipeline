@@ -2,3 +2,4 @@ scikit-learn
 fastapi
 uvicorn
 joblib
+mlflow
