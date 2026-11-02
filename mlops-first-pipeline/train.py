@@ -1,75 +1,144 @@
 from pathlib import Path
+import os
 
 import joblib
 from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score ,precision_score , recall_score
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+
 import mlflow
 import mlflow.sklearn
+# Client API lets us manage registered models and their aliases
+from mlflow import MlflowClient
 
-# Configure mlflow tracking part
-# mlflow server stores experiment metadata and model records in a backend store (like a database) and artifacts (like model files) in an artifact store (like a file system or cloud storage).
-mlflow.set_tracking_uri("http://localhost:6001")
+PROJECT_DIR = Path(__file__).resolve().parent
+MODEL_DIR = PROJECT_DIR / "models"
+tracking_uri = os.getenv(
+    "MLFLOW_TRACKING_URI",
+    f"sqlite:///{(PROJECT_DIR / 'mlflow.db').as_posix()}",
+)
 
-# Group related training runs under one exeriment name, which can be useful for organizing and comparing different runs of the same experiment.
-mlflow.set_experiment("Iris_Classification")
+# Use a local tracking store by default; set MLFLOW_TRACKING_URI for a server.
+mlflow.set_tracking_uri(tracking_uri)
 
-n_estimators = 100
-random_state = 42
+# Group related training runs under one experiment
+mlflow.set_experiment("iris-classification")
 
-# 1. Load the Iris dataset
+
 iris = load_iris()
 X = iris.data
 y = iris.target
 
-# 2. Split the dataset
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y,
 )
-model_parameters = {"model_type": "RandomForestClassifier", "n_estimators": n_estimators, "random_state": random_state , "test_size": 0.2}
-with mlflow.start_run() as run:
-    mlflow.log_params(model_parameters)
-    model = RandomForestClassifier(
-        n_estimators=100,
-        random_state=42
-    )
 
-    # 3. Create and train the model
+
+n_estimators = 100
+random_state = 42
+
+# Model settings we want to track in MLFlow
+model_parameters = {
+    "model_type": "RandomForestClassifier",
+    "n_estimators": n_estimators,
+    "random_state": random_state,
+    "test_size": 0.2
+}
+
+# Start a tracked training run
+with mlflow.start_run() as run:
+    # Record the training configuration before model fitting
+    mlflow.log_params(model_parameters)
+
+    # Build classifier using the selected parameters
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        random_state=random_state)
+
+    # Fit the model on training data
     model.fit(X_train, y_train)
-    # 4. Make predictions
+
+    # Generate predictions using test data
     y_pred = model.predict(X_test)
-    # 5. Calculate accuracy
+
+    # Calculate metrics that help us evaluate the classifier
     accuracy = accuracy_score(y_test, y_pred)
-    mlflow.log_metric("accuracy", accuracy)
-    print(f"Model accuracy: {accuracy:.2f}")
-    precision = precision_score(y_test, y_pred, average='macro', zero_division = 0)
-    mlflow.log_metric("precision", precision)
-    recall = recall_score(y_test, y_pred, average='macro', zero_division = 0)
-    mlflow.log_metric("recall", recall)
+    precision = precision_score(y_test, y_pred, average="macro", zero_division=0)
+    recall = recall_score(y_test, y_pred, average="macro", zero_division=0)
+
+    MIN_TEST_ACCURACY = 0.90
+    if accuracy < MIN_TEST_ACCURACY:
+        raise ValueError(
+            f"Model rejected: test accuracy {accuracy:.2f} is below the minimum threshold of {MIN_TEST_ACCURACY:.2f}"
+        )
+
+    # Log the evaluated results so that different runs can be compared
+    mlflow.log_metrics({
+        "test_accuracy": accuracy,
+        "test_precision": precision,
+        "test_recall": recall
+    })
 
     print("MLFlow run ID:", run.info.run_id)
     print("Test accuracy:", accuracy)
-    print("Test precision:", precision)
-    print("Test recall:", recall)
+    print("Test precision:",precision)
+    print("Test recall:",recall)
+
+
+    # Save the trained model as reusable artifact
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    model_path = MODEL_DIR / "iris_model.joblib"
+    joblib.dump(model, model_path)
+    print(f"Model saved to {model_path}")
 
     mlflow.sklearn.log_model(
         sk_model=model,
-        artifact_path="iris_model",
-        registered_model_name="iris_classifier",
+        name="iris-model",
+        registered_model_name="iris-classifier",
         skops_trusted_types=[
             "sklearn.tree._tree.Tree"
         ]
     )
 
-    print("Registered Model: iris_classifier")
+    # Assign the "champion" alias to the newly registered model
+    client = MlflowClient()
+    # Identify the current training run
+    current_run_id = mlflow.active_run().info.run_id
+    # Retrieve all versions registered under this model name
+    registered_versions = client.search_model_versions(
+        "name='iris-classifier'"
+    )
+    # Find the version created by the training run
+    current_model_version = next(
+        (
+            version
+            for version in registered_versions
+            if version.run_id == current_run_id
+        ),
+        None
+    )
 
-# 6. Create the models directory
-model_dir = Path("models")
-model_dir.mkdir(parents=True, exist_ok=True)
+    if current_model_version is None:
+        raise RuntimeError(
+            "Model was logged but its registered version could not be found"
+        )
 
-# 7. Save the trained model
-model_path = model_dir / "model.pkl"
-joblib.dump(model, model_path)
+    # Assign the alias only after model has passed quality gate
+    client.set_registered_model_alias(
+        name="iris-classifier",
+        alias="champion",
+        version=current_model_version.version
+    )
 
-print(f"Model saved to {model_path.resolve()}")
+    print(
+        f"Champion alias assigned to model version"
+        f"{current_model_version.version}"
+    )
+
+
+    print("Registered Model: iris-classifier")
