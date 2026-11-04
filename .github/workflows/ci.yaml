@@ -30,6 +30,10 @@ jobs:
       runs-on: ubuntu-latest
 
       # Steps
+      defaults:
+        run:
+          working-directory: mlops-first-pipeline
+
       steps:
           # Step-1: Download the repo content to the runner
         - name: Check out repository
@@ -91,7 +95,7 @@ jobs:
         - name: Build and Push Docker Image
           uses: docker/build-push-action@v6
           with:
-            context: .
+            context: ./mlops-first-pipeline
             push: true
             tags: ${{ steps.meta.outputs.tags }}
             labels: ${{ steps.meta.outputs.labels }}
