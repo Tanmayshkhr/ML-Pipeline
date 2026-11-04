@@ -1,6 +1,4 @@
 from pathlib import Path
-import os
-
 import joblib
 from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
@@ -12,15 +10,9 @@ import mlflow.sklearn
 # Client API lets us manage registered models and their aliases
 from mlflow import MlflowClient
 
-PROJECT_DIR = Path(__file__).resolve().parent
-MODEL_DIR = PROJECT_DIR / "models"
-tracking_uri = os.getenv(
-    "MLFLOW_TRACKING_URI",
-    f"sqlite:///{(PROJECT_DIR / 'mlflow.db').as_posix()}",
-)
-
-# Use a local tracking store by default; set MLFLOW_TRACKING_URI for a server.
-mlflow.set_tracking_uri(tracking_uri)
+# Configure MLFlow Tracking
+# MLFlow server stores experiment metadata and model records
+mlflow.set_tracking_uri("http://127.0.0.1:5000")
 
 # Group related training runs under one experiment
 mlflow.set_experiment("iris-classification")
@@ -30,16 +22,12 @@ iris = load_iris()
 X = iris.data
 y = iris.target
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42,
-    stratify=y,
-)
+X_train, X_test, y_train, y_test = train_test_split(X, 
+                                                    y, 
+                                                    test_size=0.20)
 
 
-n_estimators = 100
+n_estimators = 10
 random_state = 42
 
 # Model settings we want to track in MLFlow
@@ -47,7 +35,7 @@ model_parameters = {
     "model_type": "RandomForestClassifier",
     "n_estimators": n_estimators,
     "random_state": random_state,
-    "test_size": 0.2
+    "test_size": 0.20
 }
 
 # Start a tracked training run
@@ -57,7 +45,7 @@ with mlflow.start_run() as run:
 
     # Build classifier using the selected parameters
     model = RandomForestClassifier(
-        n_estimators=n_estimators,
+        n_estimators=n_estimators, 
         random_state=random_state)
 
     # Fit the model on training data
@@ -71,11 +59,14 @@ with mlflow.start_run() as run:
     precision = precision_score(y_test, y_pred, average="macro", zero_division=0)
     recall = recall_score(y_test, y_pred, average="macro", zero_division=0)
 
+    # Model Quality Gate
     MIN_TEST_ACCURACY = 0.90
     if accuracy < MIN_TEST_ACCURACY:
         raise ValueError(
-            f"Model rejected: test accuracy {accuracy:.2f} is below the minimum threshold of {MIN_TEST_ACCURACY:.2f}"
+            f"Model rejected: test accuracy: {accuracy:.2f} is below {MIN_TEST_ACCURACY}"
         )
+
+    print("Model Quality Gate Passed. Model is eligible for registration")
 
     # Log the evaluated results so that different runs can be compared
     mlflow.log_metrics({
@@ -91,10 +82,10 @@ with mlflow.start_run() as run:
 
 
     # Save the trained model as reusable artifact
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODEL_DIR / "iris_model.joblib"
-    joblib.dump(model, model_path)
-    print(f"Model saved to {model_path}")
+    model_dir = Path("models")
+    model_dir.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, model_dir / "iris_model.joblib")
+    print(f"Model saved to {model_dir / 'iris_model.joblib'}")
 
     mlflow.sklearn.log_model(
         sk_model=model,
