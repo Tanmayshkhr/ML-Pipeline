@@ -57,11 +57,6 @@ def create_app(model_loader: Callable=load_mlflow_model,
                 f"Failed to load MLFlow champion model..\n{ex}"
             )
 
-        client = mlflow.MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
-        champion = client.get_model_version_by_alias(
-            name="iris-classifier",
-            alias="champion"
-        )
         app.state.model_version = version_loader()
         print(f"Loaded iris-classfier version {app.state.model_version}")
         yield
@@ -103,5 +98,7 @@ def create_app(model_loader: Callable=load_mlflow_model,
             "prediction": prediction,
             "class_name": ["setosa", "versicolor", "virginica"][prediction]
         }
+    
+    return app
 
 app = create_app()
